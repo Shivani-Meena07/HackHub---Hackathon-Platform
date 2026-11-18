@@ -4,6 +4,7 @@ HackHub is a collaborative platform designed to help students manage hackathon p
 
 ## Features
 - User Authentication
+- Published hackathon discovery, filtering, and bookmarks
 - Team Creation and Management
 - Team Member Collaboration
 - Task Management
