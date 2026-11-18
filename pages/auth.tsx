@@ -11,6 +11,9 @@ export default function Auth() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [accountType, setAccountType] = useState<"student" | "organizer">(
+    "student"
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -86,7 +89,12 @@ export default function Auth() {
       const res = await fetch(`${API_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: username, email, password }),
+        body: JSON.stringify({
+          name: username,
+          email,
+          password,
+          accountType,
+        }),
       });
 
       if (!res.ok) {
@@ -99,11 +107,15 @@ export default function Auth() {
       // Save token + auth state
       localStorage.setItem("token", data.token);
       localStorage.setItem("isAuthenticated", "true");
-      localStorage.setItem("fromSignup", "true");
+      if (accountType === "student") {
+        localStorage.setItem("fromSignup", "true");
+      } else {
+        localStorage.removeItem("fromSignup");
+      }
       localStorage.setItem("user", JSON.stringify(data.user));
 
       login(username, password);
-      router.push("/team-setup");
+      router.push(accountType === "organizer" ? "/organization" : "/team-setup");
     } catch (err: any) {
       console.error("Signup error:", err);
       setError(err.message || "Unable to connect to server. Please try again.");
@@ -241,13 +253,28 @@ export default function Auth() {
           {view === "signup" && (
             <div>
               <h2 className="text-2xl font-bold text-center mb-6 text-slate-100">
-                Create Your Team
+                Create Your Account
               </h2>
               {error && <p className="text-red-500 text-center mb-4">{error}</p>}
               <form onSubmit={handleSignup}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-1 text-slate-300">
-                    Your Name (Leader)
+                    Account Type
+                  </label>
+                  <select
+                    value={accountType}
+                    onChange={(e) =>
+                      setAccountType(e.target.value as "student" | "organizer")
+                    }
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100"
+                  >
+                    <option value="student">Student</option>
+                    <option value="organizer">Organization Organizer</option>
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1 text-slate-300">
+                    Your Name
                   </label>
                   <input
                     type="text"
@@ -289,7 +316,11 @@ export default function Auth() {
                   disabled={loading}
                   className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
                 >
-                  {loading ? "Creating..." : "Sign Up & Create Team"}
+                  {loading
+                    ? "Creating..."
+                    : accountType === "organizer"
+                    ? "Sign Up as Organizer"
+                    : "Sign Up & Create Team"}
                 </button>
               </form>
             </div>

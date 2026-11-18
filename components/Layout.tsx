@@ -9,6 +9,8 @@ import {
   FileText,
   Mic,
   Users,
+  Building2,
+  CalendarDays,
   LogOut,
   Rocket,
 } from "lucide-react";
@@ -49,6 +51,8 @@ const Layout = ({ children }: LayoutProps) => {
     { name: "Files", href: "/files", icon: FileText },
     { name: "Pitch", href: "/pitch", icon: Mic },
     { name: "Team", href: "/team", icon: Users },
+    { name: "Organization", href: "/organization", icon: Building2 },
+    { name: "Hackathons", href: "/hackathons", icon: CalendarDays },
   ];
 
   const handleLogout = () => {

@@ -8,10 +8,13 @@ const jwt = require("jsonwebtoken");
 ===================================== */
 const registerUser = async (req, res) => {
   try {
-    let { name, email, password } = req.body;
+    let { name, email, password, accountType = "student" } = req.body || {};
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+    if (!["student", "organizer"].includes(accountType)) {
+      return res.status(400).json({ message: "Choose a valid account type" });
     }
 
     email = email.trim().toLowerCase();
@@ -21,7 +24,12 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const user = await User.create({ name, email, password });
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: accountType === "organizer" ? "organizer" : "member",
+    });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
@@ -33,6 +41,7 @@ const registerUser = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
       },
       token,
     });
@@ -72,6 +81,7 @@ const loginUser = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
       },
       token,
     });
