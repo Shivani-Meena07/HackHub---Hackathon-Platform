@@ -18,6 +18,9 @@ const askGeminiRoute = require("./routes/askGeminiRoute.js");
 const fileRoutes = require("./routes/fileRoute.js");
 const chatRoute = require("./routes/chatRoute.js");
 
+const mentorRoute = require("./routes/mentorRoute.js");
+const hackathonRoute = require("./routes/hackathonRoute.js");
+
 const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
