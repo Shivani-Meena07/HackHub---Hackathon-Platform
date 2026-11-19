@@ -64,6 +64,31 @@ const sendTeamMessage = async (req, res) => {
     });
     await message.populate("sender", "name");
 
+    const io = req.app.get("io");
+    if (io) {
+      try {
+        const room = `team:${team._id.toString()}`;
+        const recipients = await io.in(room).fetchSockets();
+        const savedMessage = message.toObject();
+
+        for (const recipient of recipients) {
+          const recipientUser = recipient.data.user;
+          if (!isTeamMember(team, recipientUser && recipientUser._id)) {
+            await recipient.leave(room);
+            continue;
+          }
+
+          recipient.emit("chat:message", {
+            ...savedMessage,
+            isCurrentUser:
+              recipientUser._id.toString() === req.user._id.toString(),
+          });
+        }
+      } catch (broadcastError) {
+        console.error("TEAM CHAT BROADCAST ERROR:", broadcastError);
+      }
+    }
+
     res.status(201).json({
       message: { ...message.toObject(), isCurrentUser: true },
     });

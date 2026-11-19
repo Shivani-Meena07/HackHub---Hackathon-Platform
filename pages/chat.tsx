@@ -1,13 +1,15 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Layout from "../components/Layout";
-import axios from "axios";
+import { io } from "socket.io-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000/api";
+const SOCKET_URL = API_URL.replace(/\/api\/?$/, "");
 
 interface ChatMessage {
   _id: string;
   content: string;
   createdAt: string;
+  team: string;
   isCurrentUser: boolean;
   sender: {
     _id: string;
@@ -58,8 +60,6 @@ export default function Chat() {
           _id: teamResult.team._id,
           name: teamResult.team.name,
         };
-        setTeam(currentTeam);
-
         const messagesResponse = await fetch(
           `${API_URL}/chat/${currentTeam._id}/messages`,
           { headers }
@@ -70,7 +70,10 @@ export default function Chat() {
             messageResult.message || "Could not load team messages"
           );
         }
-        if (active) setMessages(messageResult.messages);
+        if (active) {
+          setMessages(messageResult.messages);
+          setTeam(currentTeam);
+        }
       } catch (fetchError) {
         if (active) {
           setTeam(null);
@@ -91,6 +94,58 @@ export default function Chat() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!team) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Your session is missing. Please sign in again.");
+      return;
+    }
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      reconnection: true,
+      autoConnect: false,
+    });
+
+    const handleMessage = (message: ChatMessage) => {
+      if (message.team !== team._id) return;
+      setMessages((currentMessages) =>
+        currentMessages.some((current) => current._id === message._id)
+          ? currentMessages
+          : [...currentMessages, message]
+      );
+    };
+
+    socket.on("connect", () => {
+      socket.emit(
+        "chat:join",
+        team._id,
+        (result: { ok: boolean; message?: string }) => {
+          if (result.ok) {
+            setError("");
+          } else {
+            setError(result.message || "Could not join team chat");
+          }
+        }
+      );
+    });
+    socket.on("chat:message", handleMessage);
+    socket.on("disconnect", () => {
+      setError("Real-time chat disconnected. Reconnecting...");
+    });
+    socket.on("connect_error", () => {
+      setError("Could not connect to real-time chat. Retrying...");
+    });
+    socket.connect();
+
+    return () => {
+      socket.removeAllListeners();
+      socket.disconnect();
+    };
+  }, [team]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -122,7 +177,13 @@ export default function Chat() {
       if (!response.ok) {
         throw new Error(result.message || "Could not send message");
       }
-      setMessages((currentMessages) => [...currentMessages, result.message]);
+      setMessages((currentMessages) =>
+        currentMessages.some(
+          (currentMessage) => currentMessage._id === result.message._id
+        )
+          ? currentMessages
+          : [...currentMessages, result.message]
+      );
       setNewMessage("");
     } catch (sendError) {
       setError(
@@ -141,14 +202,30 @@ export default function Chat() {
     setSummaryText("");
 
     try {
-      const chatPayload = {
-        chat: messages.map((message) => ({ message: message.content })),
-      };
-      const response = await axios.post(
-        "http://127.0.0.1:5000/summarize",
-        chatPayload
-      );
-      setSummaryText(response.data.summary);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Your session is missing. Please sign in again.");
+      }
+
+      const idea = messages
+        .map(
+          (message) =>
+            `${message.sender?.name || "Former member"}: ${message.content}`
+        )
+        .join("\n");
+      const response = await fetch(`${API_URL}/gemini/summarize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ idea }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Could not summarize team chat");
+      }
+      setSummaryText(result.summary);
     } catch (summaryError) {
       console.error("Error summarizing chat:", summaryError);
       setSummaryText("Failed to generate summary. Please try again.");
